@@ -19,12 +19,34 @@ protocol AudioPlayerDelegate: AnyObject {
     func playerDidChangePlayingState(_ isPlaying: Bool)
     func playerDidChangeTrack(_ track: AudioTrack?)
     func playerDidFinishTrack()
+    func playerDidFailToLoad(_ track: AudioTrack)
+}
+
+// 默认空实现，各页面按需实现
+extension AudioPlayerDelegate {
+    func playerDidFailToLoad(_ track: AudioTrack) {}
 }
 
 final class AudioPlayerManager: NSObject {
     static let shared = AudioPlayerManager()
     
-    weak var delegate: AudioPlayerDelegate?
+    private var delegates = NSHashTable<AnyObject>.weakObjects()
+
+    func addDelegate(_ delegate: AudioPlayerDelegate) {
+        delegates.add(delegate as AnyObject)
+    }
+
+    func removeDelegate(_ delegate: AudioPlayerDelegate) {
+        delegates.remove(delegate as AnyObject)
+    }
+
+    private func notifyDelegates(_ block: (AudioPlayerDelegate) -> Void) {
+        for object in delegates.allObjects {
+            if let delegate = object as? AudioPlayerDelegate {
+                block(delegate)
+            }
+        }
+    }
     
     private var player: AVPlayer?
     private var playerItem: AVPlayerItem?
@@ -38,6 +60,13 @@ final class AudioPlayerManager: NSObject {
     
     /// 记录被中断前是否正在播放，用于中断结束后恢复
     private var wasPlayingBeforeInterruption = false
+
+    /// 逻辑播放状态：中断通知到达时系统可能已把 rate 归零，
+    /// 现场采样 rate 会误判为"未在播放"，导致中断结束后不恢复
+    private var isLogicallyPlaying = false
+
+    /// 当前曲目是否已触发过「跳过结尾」，防止重复触发
+    private var outroSkipTriggered = false
     
     // MARK: - 睡眠定时器
     private var sleepTimer: Timer?
@@ -93,6 +122,7 @@ final class AudioPlayerManager: NSObject {
         setupAudioSession()
         setupRemoteCommandCenter()
         setupInterruptionObserver()
+        setupRouteChangeObserver()
     }
     
     deinit {
@@ -120,9 +150,10 @@ final class AudioPlayerManager: NSObject {
         
         switch type {
         case .began:
-            // 中断开始（如来电），记录当前播放状态
-            wasPlayingBeforeInterruption = isPlaying
-            if isPlaying {
+            // 中断开始（如来电）。此时系统往往已把 rate 归零，
+            // 必须用逻辑播放状态判断，不能现场采样 rate
+            wasPlayingBeforeInterruption = isLogicallyPlaying
+            if wasPlayingBeforeInterruption {
                 pause()
             }
             
@@ -145,7 +176,32 @@ final class AudioPlayerManager: NSObject {
             break
         }
     }
-    
+
+    // MARK: - 输出设备变化监听
+    private func setupRouteChangeObserver() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleRouteChange),
+            name: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance()
+        )
+    }
+
+    /// 耳机拔出 / 蓝牙断开时自动暂停（有声书标准行为，避免外放尴尬）
+    @objc private func handleRouteChange(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue),
+              reason == .oldDeviceUnavailable else {
+            return
+        }
+        // 该通知可能在后台线程到达，回主线程再操作
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, self.isLogicallyPlaying else { return }
+            self.pause()
+        }
+    }
+
     // MARK: - 音频会话配置
     private func setupAudioSession() {
         do {
@@ -222,15 +278,24 @@ final class AudioPlayerManager: NSObject {
         // 保存当前曲目的播放位置（切换前）
         if let oldTrack = currentTrack, oldTrack != track {
             let position = currentTime
-            if position > 0 {
+            let total = duration
+            let outro = PlaybackStateManager.shared.getSkipOutroSeconds(forFolder: oldTrack.folderName)
+            let inOutroZone = outro > 0 && total.isFinite && total > 0
+                && total - position <= TimeInterval(outro) + 1
+            if inOutroZone {
+                // 已进入「跳过结尾」区间，视为听完并清除位置；
+                // 否则下次重播该曲目恢复到此位置时会立即再次触发跳过
+                PlaybackStateManager.shared.clearTrackPosition(url: oldTrack.url)
+            } else if position > 0 {
                 PlaybackStateManager.shared.saveTrackPosition(url: oldTrack.url, time: position)
             }
         }
-        
+
         removeTimeObserver()
         playerItemStatusObserver?.invalidate()
         playerItemStatusObserver = nil
         NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
+        outroSkipTriggered = false
         
         currentTrack = track
         playerItem = AVPlayerItem(url: track.url)
@@ -239,25 +304,35 @@ final class AudioPlayerManager: NSObject {
         // 获取文件夹级别的设置
         let folderName = track.folderName
         let skipIntro = PlaybackStateManager.shared.getSkipIntroSeconds(forFolder: folderName)
+        let skipOutro = PlaybackStateManager.shared.getSkipOutroSeconds(forFolder: folderName)
         let savedPosition = PlaybackStateManager.shared.getTrackPosition(url: track.url)
-        
+
         // 监听 playerItem 状态，等加载完成后恢复位置或应用跳过开头设置
         playerItemStatusObserver = playerItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
             guard let self = self else { return }
             if item.status == .readyToPlay {
                 DispatchQueue.main.async {
                     let skipTime = TimeInterval(skipIntro)
-                    
+                    // 恢复位置不能落进「跳过结尾」区间，否则会立即触发自动切歌
+                    let minTailGap = max(5, TimeInterval(skipOutro) + 1)
+
                     // 优先恢复保存的位置，否则使用跳过开头设置
-                    if savedPosition > 0 && savedPosition < self.duration - 5 {
+                    if savedPosition > 0 && savedPosition < self.duration - minTailGap {
                         // 有保存的位置，恢复到该位置
                         self.seek(to: savedPosition)
                     } else if skipIntro > 0 && self.duration > skipTime + 10 {
                         // 没有保存位置，应用跳过开头
                         self.seek(to: skipTime)
                     }
-                    
+
                     self.updateNowPlayingInfo()
+                }
+            } else if item.status == .failed {
+                // 文件损坏或格式不支持：复位状态并通知 UI，避免界面停留在"播放中"
+                DispatchQueue.main.async {
+                    self.isLogicallyPlaying = false
+                    self.notifyDelegates { $0.playerDidChangePlayingState(false) }
+                    self.notifyDelegates { $0.playerDidFailToLoad(track) }
                 }
             }
         }
@@ -272,9 +347,10 @@ final class AudioPlayerManager: NSObject {
         
         addTimeObserver()
         player?.rate = playbackRate
-        
-        delegate?.playerDidChangeTrack(track)
-        delegate?.playerDidChangePlayingState(true)
+        isLogicallyPlaying = true
+
+        notifyDelegates { $0.playerDidChangeTrack(track) }
+        notifyDelegates { $0.playerDidChangePlayingState(true) }
         
         // 先更新基本信息（duration 可能还是 0，等 readyToPlay 后会再次更新）
         updateNowPlayingInfo()
@@ -285,14 +361,21 @@ final class AudioPlayerManager: NSObject {
     }
     
     func play() {
+        guard player != nil else { return }
+        // 已播到末尾时（如列表播完后再按播放），从头重播当前曲目
+        if duration > 0, duration.isFinite, currentTime >= duration - 0.5 {
+            seek(to: 0)
+        }
+        isLogicallyPlaying = true
         player?.rate = playbackRate
-        delegate?.playerDidChangePlayingState(true)
+        notifyDelegates { $0.playerDidChangePlayingState(true) }
         updateNowPlayingInfo()
     }
-    
+
     func pause() {
+        isLogicallyPlaying = false
         player?.pause()
-        delegate?.playerDidChangePlayingState(false)
+        notifyDelegates { $0.playerDidChangePlayingState(false) }
         updateNowPlayingInfo()
         saveState()
         
@@ -325,10 +408,43 @@ final class AudioPlayerManager: NSObject {
             seek(to: 0)
         }
     }
-    
+
+    // MARK: - 播放列表维护
+
+    /// 曲目被删除后同步播放列表，并修正 currentIndex，防止上一/下一曲错位
+    func updatePlaylist(afterDeletion newPlaylist: [AudioTrack]) {
+        currentPlaylist = newPlaylist
+        if let track = currentTrack, let index = newPlaylist.firstIndex(of: track) {
+            currentIndex = index
+        }
+    }
+
+    /// 完全停止并卸载当前播放内容（删除正在播放的文件/文件夹时调用）
+    func stop() {
+        isLogicallyPlaying = false
+        player?.pause()
+        removeTimeObserver()
+        playerItemStatusObserver?.invalidate()
+        playerItemStatusObserver = nil
+        if let item = playerItem {
+            NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: item)
+        }
+        player = nil
+        playerItem = nil
+        currentTrack = nil
+        currentPlaylist = []
+        currentIndex = 0
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        PlaybackStateManager.shared.clearState()
+        notifyDelegates { $0.playerDidChangeTrack(nil) }
+        notifyDelegates { $0.playerDidChangePlayingState(false) }
+    }
+
     // MARK: - 进度控制
     func seek(to time: TimeInterval) {
-        let cmTime = CMTime(seconds: time, preferredTimescale: 600)
+        // duration 未就绪/加载失败时上层可能算出 NaN，seek 到非法 CMTime 会抛异常崩溃
+        guard time.isFinite else { return }
+        let cmTime = CMTime(seconds: max(0, time), preferredTimescale: 600)
         
         // 立即更新锁屏信息（使用目标时间），避免进度条跳动
         updateNowPlayingInfo(elapsedTime: time)
@@ -382,6 +498,8 @@ final class AudioPlayerManager: NSObject {
         sleepTimer = nil
         sleepTimerEndDate = nil
         sleepAtEndOfTrack = false
+        // 在最后 30 秒淡出阶段取消时，必须恢复音量，否则会一直停留在低音量
+        player?.volume = 1.0
         NotificationCenter.default.post(name: .sleepTimerDidChange, object: nil)
     }
     
@@ -426,7 +544,7 @@ final class AudioPlayerManager: NSObject {
             
             guard total.isFinite && !total.isNaN else { return }
             
-            self.delegate?.playerDidUpdateTime(current, duration: total)
+            self.notifyDelegates { $0.playerDidUpdateTime(current, duration: total) }
             
             // 定期更新锁屏/蓝牙进度信息
             // 使用倍速播放时更频繁更新（每5秒），正常速度每10秒更新
@@ -446,17 +564,16 @@ final class AudioPlayerManager: NSObject {
             }
             
             // 跳过结尾检测（使用文件夹级别设置）
+            // 必须限定播放中触发：periodic observer 在 seek 时也会回调，
+            // 否则暂停状态下拖进度条到结尾区间会被误触发切歌并开始播放。
+            // 用 outroSkipTriggered 一次性标记代替原来的 1 秒窗口，主线程卡顿错过窗口也不会漏触发
             let folderName = self.currentTrack?.folderName ?? ""
             let skipOutro = PlaybackStateManager.shared.getSkipOutroSeconds(forFolder: folderName)
-            if skipOutro > 0 {
-                let skipTime = TimeInterval(skipOutro)
-                // 当剩余时间小于设定值时，自动播放下一曲
-                if total - current <= skipTime && total - current > skipTime - 1 {
-                    // 确保只触发一次（在 1 秒窗口内）
-                    if self.currentIndex < self.currentPlaylist.count - 1 {
-                        self.playNext()
-                    }
-                }
+            if skipOutro > 0, self.isPlaying, !self.outroSkipTriggered,
+               self.currentIndex < self.currentPlaylist.count - 1,
+               total - current <= TimeInterval(skipOutro) {
+                self.outroSkipTriggered = true
+                self.playNext()
             }
         }
     }
@@ -475,21 +592,23 @@ final class AudioPlayerManager: NSObject {
             PlaybackStateManager.shared.clearTrackPosition(url: track.url)
         }
         
-        delegate?.playerDidFinishTrack()
-        
+        notifyDelegates { $0.playerDidFinishTrack() }
+
         // 如果设置了"播完本曲停止"，则停止播放
         if sleepAtEndOfTrack {
             cancelSleepTimer()
-            delegate?.playerDidChangePlayingState(false)
+            isLogicallyPlaying = false
+            notifyDelegates { $0.playerDidChangePlayingState(false) }
             return
         }
-        
+
         // 自动播放下一曲
         if currentIndex < currentPlaylist.count - 1 {
             playNext()
         } else {
             // 播放列表结束
-            delegate?.playerDidChangePlayingState(false)
+            isLogicallyPlaying = false
+            notifyDelegates { $0.playerDidChangePlayingState(false) }
         }
     }
     
@@ -558,7 +677,9 @@ final class AudioPlayerManager: NSObject {
         }
         
         let tracks = FileService.shared.getTracks(in: folder)
-        guard let track = tracks.first(where: { $0.url == savedURL }) else {
+        // 用标准化路径比较，避免 /private/var 与 /var 等 URL 形式差异导致匹配失败
+        let savedPath = savedURL.standardizedFileURL.path
+        guard let track = tracks.first(where: { $0.url.standardizedFileURL.path == savedPath }) else {
             return
         }
         
@@ -568,10 +689,14 @@ final class AudioPlayerManager: NSObject {
             currentIndex = index
         }
         
-        // 清理之前的观察者
+        // 清理之前的观察者（与 playTrack 保持一致：
+        // 不清理 time observer 会导致泄漏，不清理通知会导致播放结束回调重复触发）
+        removeTimeObserver()
         playerItemStatusObserver?.invalidate()
         playerItemStatusObserver = nil
-        
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
+        outroSkipTriggered = false
+
         // 加载但不播放
         currentTrack = track
         playerItem = AVPlayerItem(url: track.url)
@@ -602,7 +727,7 @@ final class AudioPlayerManager: NSObject {
         )
         
         addTimeObserver()
-        delegate?.playerDidChangeTrack(track)
+        notifyDelegates { $0.playerDidChangeTrack(track) }
     }
 }
 

@@ -8,171 +8,224 @@
 import UIKit
 
 final class PlayerViewController: UIViewController {
-    
-    // MARK: - UI
+
+    // MARK: - UI Components
+
+    private let dragHandle: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = DesignTokens.dragHandleColor
+        view.layer.cornerRadius = DesignTokens.dragHandleHeight / 2
+        return view
+    }()
+
+    private let nowPlayingLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.text = "正在播放"
+        label.font = DesignTokens.labelMedium
+        label.textColor = DesignTokens.secondary
+        label.textAlignment = .center
+        return label
+    }()
+
     private let trackIconView: UIView = {
         let view = UIView()
         view.translatesAutoresizingMaskIntoConstraints = false
-        view.backgroundColor = .systemGray5
-        view.layer.cornerRadius = 16
+        view.backgroundColor = DesignTokens.surfaceVariant
+        view.layer.cornerRadius = DesignTokens.CornerRadius.xl
+        view.clipsToBounds = false
         return view
     }()
-    
+
     private let trackIconImage: UIImageView = {
         let imageView = UIImageView()
         imageView.translatesAutoresizingMaskIntoConstraints = false
         imageView.image = UIImage(systemName: "music.note")
-        imageView.tintColor = .systemOrange
+        imageView.tintColor = DesignTokens.primary
         imageView.contentMode = .scaleAspectFit
         return imageView
     }()
-    
+
     private let titleLabel: UILabel = {
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.font = .systemFont(ofSize: 20, weight: .semibold)
-        label.textColor = .label
+        label.font = DesignTokens.headlineMedium
+        label.textColor = DesignTokens.onSurface
         label.textAlignment = .center
         label.numberOfLines = 2
         return label
     }()
-    
+
     private let subtitleLabel: UILabel = {
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.font = .systemFont(ofSize: 15)
-        label.textColor = .secondaryLabel
+        label.font = DesignTokens.bodyMedium
+        label.textColor = DesignTokens.secondary
         label.textAlignment = .center
         return label
     }()
-    
+
     private let progressSlider: UISlider = {
         let slider = UISlider()
         slider.translatesAutoresizingMaskIntoConstraints = false
-        slider.minimumTrackTintColor = .systemOrange
-        slider.maximumTrackTintColor = .systemGray4
-        slider.setThumbImage(makeThumbImage(size: 14), for: .normal)
+        slider.minimumTrackTintColor = DesignTokens.primaryContainer
+        slider.maximumTrackTintColor = DesignTokens.surfaceVariant
+        slider.setThumbImage(makeThumbImage(size: 12), for: .normal)
         return slider
     }()
-    
+
     private let currentTimeLabel: UILabel = {
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
-        label.textColor = .secondaryLabel
+        label.font = DesignTokens.monoDigits(size: 12)
+        label.textColor = DesignTokens.secondary
         label.text = "00:00"
         return label
     }()
-    
+
     private let remainingTimeLabel: UILabel = {
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
-        label.textColor = .secondaryLabel
+        label.font = DesignTokens.monoDigits(size: 12)
+        label.textColor = DesignTokens.secondary
         label.text = "-00:00"
         label.textAlignment = .right
         return label
     }()
-    
-    private lazy var skipBackwardButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.setImage(UIImage(systemName: "gobackward.15", withConfiguration: UIImage.SymbolConfiguration(pointSize: 32)), for: .normal)
-        button.tintColor = .label
-        button.addTarget(self, action: #selector(skipBackwardTapped), for: .touchUpInside)
-        return button
-    }()
-    
-    private lazy var playPauseButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.setImage(UIImage(systemName: "play.circle.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 64)), for: .normal)
-        button.tintColor = .systemOrange
-        button.addTarget(self, action: #selector(playPauseTapped), for: .touchUpInside)
-        return button
-    }()
-    
-    private lazy var skipForwardButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.setImage(UIImage(systemName: "goforward.15", withConfiguration: UIImage.SymbolConfiguration(pointSize: 32)), for: .normal)
-        button.tintColor = .label
-        button.addTarget(self, action: #selector(skipForwardTapped), for: .touchUpInside)
-        return button
-    }()
-    
+
     private lazy var previousButton: UIButton = {
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.setImage(UIImage(systemName: "backward.end.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 24)), for: .normal)
-        button.tintColor = .label
+        let config = UIImage.SymbolConfiguration(pointSize: 22)
+        button.setImage(UIImage(systemName: "backward.end.fill", withConfiguration: config), for: .normal)
+        button.tintColor = DesignTokens.onSurfaceVariant
         button.addTarget(self, action: #selector(previousTapped), for: .touchUpInside)
         return button
     }()
-    
+
+    private lazy var skipBackwardButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        let config = UIImage.SymbolConfiguration(pointSize: 28)
+        button.setImage(UIImage(systemName: "gobackward.5", withConfiguration: config), for: .normal)
+        button.tintColor = DesignTokens.onSurface
+        button.addTarget(self, action: #selector(skipBackwardTapped), for: .touchUpInside)
+        return button
+    }()
+
+    private lazy var playPauseButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        let config = UIImage.SymbolConfiguration(pointSize: 64)
+        button.setImage(UIImage(systemName: "play.circle.fill", withConfiguration: config), for: .normal)
+        button.tintColor = DesignTokens.primaryContainer
+        button.addTarget(self, action: #selector(playPauseTapped), for: .touchUpInside)
+        return button
+    }()
+
+    private lazy var skipForwardButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        let config = UIImage.SymbolConfiguration(pointSize: 28)
+        button.setImage(UIImage(systemName: "goforward.5", withConfiguration: config), for: .normal)
+        button.tintColor = DesignTokens.onSurface
+        button.addTarget(self, action: #selector(skipForwardTapped), for: .touchUpInside)
+        return button
+    }()
+
     private lazy var nextButton: UIButton = {
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.setImage(UIImage(systemName: "forward.end.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 24)), for: .normal)
-        button.tintColor = .label
+        let config = UIImage.SymbolConfiguration(pointSize: 22)
+        button.setImage(UIImage(systemName: "forward.end.fill", withConfiguration: config), for: .normal)
+        button.tintColor = DesignTokens.onSurfaceVariant
         button.addTarget(self, action: #selector(nextTapped), for: .touchUpInside)
         return button
     }()
-    
+
+    // Bottom toolbar buttons
     private lazy var rateButton: UIButton = {
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.titleLabel?.font = .systemFont(ofSize: 15, weight: .medium)
-        button.setTitleColor(.label, for: .normal)
-        button.backgroundColor = .systemGray5
-        button.layer.cornerRadius = 16
+        button.titleLabel?.font = DesignTokens.labelLarge
+        button.setTitleColor(DesignTokens.onSurface, for: .normal)
+        button.backgroundColor = DesignTokens.surfaceContainer
+        button.layer.cornerRadius = DesignTokens.CornerRadius.medium
+        button.contentEdgeInsets = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
         button.addTarget(self, action: #selector(rateTapped), for: .touchUpInside)
         return button
     }()
-    
+
     private lazy var sleepTimerButton: UIButton = {
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
-        // 使用等宽数字字体，避免数字变化时宽度跳动
         button.titleLabel?.font = .monospacedDigitSystemFont(ofSize: 14, weight: .medium)
-        button.setTitleColor(.label, for: .normal)
+        button.setTitleColor(DesignTokens.onSurface, for: .normal)
         button.setImage(UIImage(systemName: "moon.zzz", withConfiguration: UIImage.SymbolConfiguration(pointSize: 14)), for: .normal)
-        button.tintColor = .label
-        button.backgroundColor = .systemGray5
-        button.layer.cornerRadius = 16
-        // 固定内容边距，避免大小变化
+        button.tintColor = DesignTokens.onSurface
+        button.backgroundColor = DesignTokens.surfaceContainer
+        button.layer.cornerRadius = DesignTokens.CornerRadius.medium
         button.contentEdgeInsets = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
         button.addTarget(self, action: #selector(sleepTimerTapped), for: .touchUpInside)
         return button
     }()
-    
+
+    // Controls container for horizontal layout
+    private let controlsStack: UIStackView = {
+        let stack = UIStackView()
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.axis = .horizontal
+        stack.alignment = .center
+        stack.distribution = .fill
+        return stack
+    }()
+
+    // Bottom toolbar container
+    private let toolbarStack: UIStackView = {
+        let stack = UIStackView()
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.axis = .horizontal
+        stack.alignment = .center
+        stack.distribution = .equalSpacing
+        return stack
+    }()
+
+    // MARK: - State
     private var isSeeking = false
-    
+    private var lastSleepTimerState: String = ""
+
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
+        setupModalAppearance()
         setupUI()
         setupSliderActions()
         setupSleepTimerObserver()
-        
-        AudioPlayerManager.shared.delegate = self
+
+        AudioPlayerManager.shared.addDelegate(self)
         updateUI()
     }
-    
+
     deinit {
         NotificationCenter.default.removeObserver(self)
     }
-    
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-        // 恢复上一个页面的 delegate
+
+    // MARK: - Modal Setup
+    private func setupModalAppearance() {
+        if let sheet = sheetPresentationController {
+            sheet.prefersGrabberVisible = false
+            sheet.preferredCornerRadius = DesignTokens.CornerRadius.sheet
+        }
     }
-    
-    // MARK: - Setup
+
+    // MARK: - Setup UI
     private func setupUI() {
-        view.backgroundColor = .systemBackground
-        
-        // 添加子视图
+        view.backgroundColor = DesignTokens.background
+
+        // Add all subviews
+        view.addSubview(dragHandle)
+        view.addSubview(nowPlayingLabel)
         view.addSubview(trackIconView)
         trackIconView.addSubview(trackIconImage)
         view.addSubview(titleLabel)
@@ -180,128 +233,166 @@ final class PlayerViewController: UIViewController {
         view.addSubview(progressSlider)
         view.addSubview(currentTimeLabel)
         view.addSubview(remainingTimeLabel)
-        view.addSubview(previousButton)
-        view.addSubview(skipBackwardButton)
-        view.addSubview(playPauseButton)
-        view.addSubview(skipForwardButton)
-        view.addSubview(nextButton)
-        view.addSubview(rateButton)
-        view.addSubview(sleepTimerButton)
-        
+
+        // Controls row using spacer views for precise spacing
+        view.addSubview(controlsStack)
+        let leftSpacer1 = makeSpacer(width: 20)
+        let leftSpacer2 = makeSpacer(width: 24)
+        let rightSpacer1 = makeSpacer(width: 24)
+        let rightSpacer2 = makeSpacer(width: 20)
+
+        controlsStack.addArrangedSubview(previousButton)
+        controlsStack.addArrangedSubview(leftSpacer1)
+        controlsStack.addArrangedSubview(skipBackwardButton)
+        controlsStack.addArrangedSubview(leftSpacer2)
+        controlsStack.addArrangedSubview(playPauseButton)
+        controlsStack.addArrangedSubview(rightSpacer1)
+        controlsStack.addArrangedSubview(skipForwardButton)
+        controlsStack.addArrangedSubview(rightSpacer2)
+        controlsStack.addArrangedSubview(nextButton)
+
+        // Bottom toolbar
+        view.addSubview(toolbarStack)
+        toolbarStack.addArrangedSubview(rateButton)
+        toolbarStack.addArrangedSubview(sleepTimerButton)
+
+        // Apply warm shadow to album art
+        DesignTokens.applyWarmShadow(to: trackIconView.layer)
+
         NSLayoutConstraint.activate([
-            // 音乐图标
-            trackIconView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 40),
+            // Drag handle: centered, 12pt below safe area top
+            dragHandle.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: DesignTokens.Spacing.md),
+            dragHandle.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            dragHandle.widthAnchor.constraint(equalToConstant: DesignTokens.dragHandleWidth),
+            dragHandle.heightAnchor.constraint(equalToConstant: DesignTokens.dragHandleHeight),
+
+            // "正在播放" label: centered, 16pt below drag handle
+            nowPlayingLabel.topAnchor.constraint(equalTo: dragHandle.bottomAnchor, constant: DesignTokens.Spacing.lg),
+            nowPlayingLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+
+            // Album art: centered, square, below nowPlayingLabel
+            // 用 view 宽度约束而不是 UIScreen.main，避免 iPad/分屏下尺寸错误
+            trackIconView.topAnchor.constraint(equalTo: nowPlayingLabel.bottomAnchor, constant: DesignTokens.Spacing.xl),
             trackIconView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            trackIconView.widthAnchor.constraint(equalToConstant: 200),
-            trackIconView.heightAnchor.constraint(equalToConstant: 200),
-            
+            trackIconView.widthAnchor.constraint(equalTo: view.widthAnchor, constant: -80),
+            trackIconView.heightAnchor.constraint(equalTo: trackIconView.widthAnchor),
+
+            // Music note icon inside art
             trackIconImage.centerXAnchor.constraint(equalTo: trackIconView.centerXAnchor),
             trackIconImage.centerYAnchor.constraint(equalTo: trackIconView.centerYAnchor),
             trackIconImage.widthAnchor.constraint(equalToConstant: 80),
             trackIconImage.heightAnchor.constraint(equalToConstant: 80),
-            
-            // 标题
-            titleLabel.topAnchor.constraint(equalTo: trackIconView.bottomAnchor, constant: 32),
-            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            
-            // 副标题
-            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
-            subtitleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            subtitleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            
-            // 进度条
-            progressSlider.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 32),
-            progressSlider.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            progressSlider.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            
-            // 时间标签
-            currentTimeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 8),
+
+            // Title: 24pt below art
+            titleLabel.topAnchor.constraint(equalTo: trackIconView.bottomAnchor, constant: DesignTokens.Spacing.xl),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: DesignTokens.Spacing.xl),
+            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -DesignTokens.Spacing.xl),
+
+            // Subtitle: 4pt below title
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: DesignTokens.Spacing.xs),
+            subtitleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: DesignTokens.Spacing.xl),
+            subtitleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -DesignTokens.Spacing.xl),
+
+            // Progress slider: 32pt below subtitle
+            progressSlider.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: DesignTokens.Spacing.xxl),
+            progressSlider.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: DesignTokens.Spacing.xl),
+            progressSlider.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -DesignTokens.Spacing.xl),
+
+            // Time labels
+            currentTimeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: DesignTokens.Spacing.sm),
             currentTimeLabel.leadingAnchor.constraint(equalTo: progressSlider.leadingAnchor),
-            
-            remainingTimeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 8),
+
+            remainingTimeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: DesignTokens.Spacing.sm),
             remainingTimeLabel.trailingAnchor.constraint(equalTo: progressSlider.trailingAnchor),
-            
-            // 播放控制
-            playPauseButton.topAnchor.constraint(equalTo: currentTimeLabel.bottomAnchor, constant: 32),
-            playPauseButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+
+            // Controls row: 32pt below progress area
+            controlsStack.topAnchor.constraint(equalTo: currentTimeLabel.bottomAnchor, constant: DesignTokens.Spacing.xxl),
+            controlsStack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+
+            // Play/pause button size
             playPauseButton.widthAnchor.constraint(equalToConstant: 80),
             playPauseButton.heightAnchor.constraint(equalToConstant: 80),
-            
-            skipBackwardButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
-            skipBackwardButton.trailingAnchor.constraint(equalTo: playPauseButton.leadingAnchor, constant: -24),
-            
-            skipForwardButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
-            skipForwardButton.leadingAnchor.constraint(equalTo: playPauseButton.trailingAnchor, constant: 24),
-            
-            previousButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
-            previousButton.trailingAnchor.constraint(equalTo: skipBackwardButton.leadingAnchor, constant: -16),
-            
-            nextButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
-            nextButton.leadingAnchor.constraint(equalTo: skipForwardButton.trailingAnchor, constant: 16),
-            
-            // 底部按钮
-            rateButton.topAnchor.constraint(equalTo: playPauseButton.bottomAnchor, constant: 40),
-            rateButton.trailingAnchor.constraint(equalTo: view.centerXAnchor, constant: -8),
-            rateButton.widthAnchor.constraint(equalToConstant: 80),
-            rateButton.heightAnchor.constraint(equalToConstant: 32),
-            
-            sleepTimerButton.topAnchor.constraint(equalTo: playPauseButton.bottomAnchor, constant: 40),
-            sleepTimerButton.leadingAnchor.constraint(equalTo: view.centerXAnchor, constant: 8),
-            sleepTimerButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
-            sleepTimerButton.heightAnchor.constraint(equalToConstant: 32)
+
+            // Bottom toolbar: 40pt below controls
+            toolbarStack.topAnchor.constraint(equalTo: controlsStack.bottomAnchor, constant: DesignTokens.Spacing.xxxl),
+            toolbarStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: DesignTokens.Spacing.xxl),
+            toolbarStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -DesignTokens.Spacing.xxl),
+
+            // Toolbar button heights
+            rateButton.heightAnchor.constraint(equalToConstant: 36),
+            sleepTimerButton.heightAnchor.constraint(equalToConstant: 36),
         ])
     }
-    
+
+    private func makeSpacer(width: CGFloat) -> UIView {
+        let spacer = UIView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        spacer.widthAnchor.constraint(equalToConstant: width).isActive = true
+        return spacer
+    }
+
     private func setupSliderActions() {
         progressSlider.addTarget(self, action: #selector(sliderTouchBegan), for: .touchDown)
         progressSlider.addTarget(self, action: #selector(sliderValueChanged), for: .valueChanged)
         progressSlider.addTarget(self, action: #selector(sliderTouchEnded), for: [.touchUpInside, .touchUpOutside, .touchCancel])
     }
-    
+
     // MARK: - Actions
     @objc private func playPauseTapped() {
         AudioPlayerManager.shared.togglePlayPause()
     }
-    
+
     @objc private func skipBackwardTapped() {
-        AudioPlayerManager.shared.skipBackward(15)
+        AudioPlayerManager.shared.skipBackward(5)
     }
-    
+
     @objc private func skipForwardTapped() {
-        AudioPlayerManager.shared.skipForward(15)
+        AudioPlayerManager.shared.skipForward(5)
     }
-    
+
     @objc private func previousTapped() {
         AudioPlayerManager.shared.playPrevious()
     }
-    
+
     @objc private func nextTapped() {
         AudioPlayerManager.shared.playNext()
     }
-    
+
     @objc private func rateTapped() {
-        showRatePicker()
+        showSpeedPicker()
     }
-    
+
     @objc private func sliderTouchBegan() {
         isSeeking = true
     }
-    
+
     @objc private func sliderValueChanged() {
         let duration = AudioPlayerManager.shared.duration
         let newTime = TimeInterval(progressSlider.value) * duration
         currentTimeLabel.text = newTime.formattedTime
         remainingTimeLabel.text = "-\((duration - newTime).formattedTime)"
     }
-    
+
     @objc private func sliderTouchEnded() {
+        defer { isSeeking = false }
         let duration = AudioPlayerManager.shared.duration
+        // duration 未就绪（NaN/0）时不 seek，否则会算出非法时间
+        guard duration > 0, duration.isFinite else { return }
         let newTime = TimeInterval(progressSlider.value) * duration
         AudioPlayerManager.shared.seek(to: newTime)
-        isSeeking = false
     }
-    
+
+    // MARK: - Speed Picker Overlay
+    private func showSpeedPicker() {
+        let overlay = SpeedPickerOverlay()
+        overlay.currentSpeed = AudioPlayerManager.shared.playbackRate
+        overlay.onSpeedSelected = { [weak self] speed in
+            AudioPlayerManager.shared.playbackRate = speed
+            self?.updateRateButton()
+        }
+        overlay.show(in: self.view)
+    }
+
     // MARK: - Sleep Timer
     private func setupSleepTimerObserver() {
         NotificationCenter.default.addObserver(
@@ -311,74 +402,51 @@ final class PlayerViewController: UIViewController {
             object: nil
         )
     }
-    
+
     @objc private func sleepTimerTapped() {
-        showSleepTimerPicker()
+        showSleepTimerOverlay()
     }
-    
+
     @objc private func sleepTimerDidChange() {
         updateSleepTimerButton()
     }
-    
-    private func showSleepTimerPicker() {
+
+    private func showSleepTimerOverlay() {
         let player = AudioPlayerManager.shared
-        
-        let alert = UIAlertController(title: "睡眠定时器", message: "设定时间后自动停止播放", preferredStyle: .actionSheet)
-        
-        // 定时选项
-        let options: [(String, Int)] = [
-            ("15 分钟", 15),
-            ("30 分钟", 30),
-            ("45 分钟", 45),
-            ("60 分钟", 60),
-            ("90 分钟", 90)
-        ]
-        
-        for (title, minutes) in options {
-            alert.addAction(UIAlertAction(title: title, style: .default) { _ in
-                player.setSleepTimer(minutes: minutes)
-            })
+        let overlay = SleepTimerOverlay()
+        overlay.isTimerActive = player.isSleepTimerActive
+        overlay.sleepAtEndOfTrack = player.sleepAtEndOfTrack
+
+        // Determine active minutes for highlighting
+        if let remaining = player.sleepTimerRemaining, remaining > 0 {
+            // Approximate to nearest option
+            let totalMinutes = Int(remaining / 60)
+            overlay.activeMinutes = totalMinutes
         }
-        
-        // 自定义时间
-        alert.addAction(UIAlertAction(title: "自定义时间...", style: .default) { [weak self] _ in
-            self?.showCustomSleepTimerInput()
-        })
-        
-        // 播完本曲
-        let endOfTrackAction = UIAlertAction(title: "播完本曲", style: .default) { _ in
+
+        overlay.onTimerSelected = { minutes in
+            player.setSleepTimer(minutes: minutes)
+        }
+        overlay.onEndOfTrack = {
             player.setSleepAtEndOfTrack()
         }
-        if player.sleepAtEndOfTrack {
-            endOfTrackAction.setValue(true, forKey: "checked")
+        overlay.onCancel = {
+            player.cancelSleepTimer()
         }
-        alert.addAction(endOfTrackAction)
-        
-        // 取消定时器（如果已激活）
-        if player.isSleepTimerActive {
-            alert.addAction(UIAlertAction(title: "取消定时器", style: .destructive) { _ in
-                player.cancelSleepTimer()
-            })
+        overlay.onCustomTime = { [weak self] in
+            self?.showCustomSleepTimerInput()
         }
-        
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        if let popover = alert.popoverPresentationController {
-            popover.sourceView = sleepTimerButton
-            popover.sourceRect = sleepTimerButton.bounds
-        }
-        
-        present(alert, animated: true)
+        overlay.show(in: self.view)
     }
-    
+
     private func showCustomSleepTimerInput() {
         let alert = UIAlertController(title: "自定义定时", message: "请输入分钟数", preferredStyle: .alert)
-        
+
         alert.addTextField { textField in
             textField.placeholder = "分钟"
             textField.keyboardType = .numberPad
         }
-        
+
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
             if let text = alert.textFields?.first?.text,
@@ -386,93 +454,50 @@ final class PlayerViewController: UIViewController {
                 AudioPlayerManager.shared.setSleepTimer(minutes: minutes)
             }
         })
-        
+
         present(alert, animated: true)
     }
-    
-    /// 上一次显示的定时器状态，用于避免重复更新
-    private var lastSleepTimerState: String = ""
-    
+
     private func updateSleepTimerButton() {
         let player = AudioPlayerManager.shared
-        
-        var newState: String
-        var title: String
-        var isActive: Bool
-        
+
+        let title: String
+        let isActive: Bool
+
         if player.sleepAtEndOfTrack {
-            newState = "endOfTrack"
             title = "本曲"
             isActive = true
         } else if let remaining = player.sleepTimerRemaining, remaining > 0 {
             let totalSeconds = Int(remaining)
-            let minutes = totalSeconds / 60
-            let seconds = totalSeconds % 60
-            // 使用固定格式，保持宽度一致
-            title = String(format: "%d:%02d", minutes, seconds)
-            newState = "timer_\(totalSeconds)"
+            title = String(format: "%d:%02d", totalSeconds / 60, totalSeconds % 60)
             isActive = true
         } else {
-            newState = "inactive"
             title = "定时"
             isActive = false
         }
-        
-        // 只在状态变化时更新 UI，避免闪动
-        // 对于倒计时，每秒都会变化，但我们只更新文字
+
         let stateCategory = isActive ? "active" : "inactive"
         if lastSleepTimerState != stateCategory {
             lastSleepTimerState = stateCategory
-            
+
             let iconName = isActive ? "moon.fill" : "moon.zzz"
-            let color: UIColor = isActive ? .systemOrange : .label
-            
+            let color: UIColor = isActive ? DesignTokens.primaryContainer : DesignTokens.onSurface
+
             sleepTimerButton.setImage(UIImage(systemName: iconName, withConfiguration: UIImage.SymbolConfiguration(pointSize: 14)), for: .normal)
             sleepTimerButton.tintColor = color
             sleepTimerButton.setTitleColor(color, for: .normal)
         }
-        
-        // 更新文字（使用 UIView.performWithoutAnimation 避免动画）
+
         UIView.performWithoutAnimation {
             sleepTimerButton.setTitle(title, for: .normal)
             sleepTimerButton.layoutIfNeeded()
         }
     }
-    
-    // MARK: - Rate Picker
-    private func showRatePicker() {
-        let alert = UIAlertController(title: "播放速度", message: nil, preferredStyle: .actionSheet)
-        
-        let currentRate = AudioPlayerManager.shared.playbackRate
-        
-        for rate in AudioPlayerManager.availableRates {
-            let title = rate == 1.0 ? "正常" : "\(rate)x"
-            let action = UIAlertAction(title: title, style: .default) { [weak self] _ in
-                AudioPlayerManager.shared.playbackRate = rate
-                self?.updateRateButton()
-            }
-            
-            if abs(rate - currentRate) < 0.01 {
-                action.setValue(true, forKey: "checked")
-            }
-            
-            alert.addAction(action)
-        }
-        
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        if let popover = alert.popoverPresentationController {
-            popover.sourceView = rateButton
-            popover.sourceRect = rateButton.bounds
-        }
-        
-        present(alert, animated: true)
-    }
-    
+
     // MARK: - Update UI
     private func updateUI() {
         let player = AudioPlayerManager.shared
-        
+
         if let track = player.currentTrack {
             titleLabel.text = track.displayName
             subtitleLabel.text = track.folderName
@@ -480,24 +505,25 @@ final class PlayerViewController: UIViewController {
             titleLabel.text = "未在播放"
             subtitleLabel.text = ""
         }
-        
+
         updatePlayPauseButton(isPlaying: player.isPlaying)
         updateRateButton()
         updateSleepTimerButton()
         updateProgress(current: player.currentTime, duration: player.duration)
     }
-    
+
     private func updatePlayPauseButton(isPlaying: Bool) {
         let imageName = isPlaying ? "pause.circle.fill" : "play.circle.fill"
-        playPauseButton.setImage(UIImage(systemName: imageName, withConfiguration: UIImage.SymbolConfiguration(pointSize: 64)), for: .normal)
+        let config = UIImage.SymbolConfiguration(pointSize: 64)
+        playPauseButton.setImage(UIImage(systemName: imageName, withConfiguration: config), for: .normal)
     }
-    
+
     private func updateRateButton() {
         let rate = AudioPlayerManager.shared.playbackRate
         let title = rate == 1.0 ? "1x" : "\(rate)x"
         rateButton.setTitle(title, for: .normal)
     }
-    
+
     private func updateProgress(current: TimeInterval, duration: TimeInterval) {
         guard !isSeeking else { return }
         guard duration > 0 && duration.isFinite else {
@@ -506,22 +532,22 @@ final class PlayerViewController: UIViewController {
             remainingTimeLabel.text = "-00:00"
             return
         }
-        
+
         progressSlider.value = Float(current / duration)
         currentTimeLabel.text = current.formattedTime
         remainingTimeLabel.text = "-\((duration - current).formattedTime)"
     }
-    
+
     // MARK: - Helper
     private static func makeThumbImage(size: CGFloat) -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
         return renderer.image { context in
             let rect = CGRect(origin: .zero, size: CGSize(width: size, height: size))
-            UIColor.white.setFill()
+            DesignTokens.surfaceContainer.setFill()
             context.cgContext.fillEllipse(in: rect)
-            UIColor.systemGray3.setStroke()
-            context.cgContext.setLineWidth(0.5)
-            context.cgContext.strokeEllipse(in: rect.insetBy(dx: 0.25, dy: 0.25))
+            DesignTokens.primary.setStroke()
+            context.cgContext.setLineWidth(1.5)
+            context.cgContext.strokeEllipse(in: rect.insetBy(dx: 0.75, dy: 0.75))
         }
     }
 }
@@ -531,19 +557,16 @@ extension PlayerViewController: AudioPlayerDelegate {
     func playerDidUpdateTime(_ currentTime: TimeInterval, duration: TimeInterval) {
         updateProgress(current: currentTime, duration: duration)
     }
-    
+
     func playerDidChangePlayingState(_ isPlaying: Bool) {
         updatePlayPauseButton(isPlaying: isPlaying)
     }
-    
+
     func playerDidChangeTrack(_ track: AudioTrack?) {
         updateUI()
     }
-    
+
     func playerDidFinishTrack() {
-        // 播放结束
+        // Track finished
     }
 }
-
-
-

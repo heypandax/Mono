@@ -6,21 +6,13 @@
 //
 
 import UIKit
-import AVFoundation
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // 配置音频会话
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .spokenAudio, options: [])
-            try session.setActive(true)
-        } catch {
-            print("音频会话配置失败: \(error)")
-        }
-        
+        // 音频会话在 AudioPlayerManager 初始化时配置并激活（启动即激活是产品需求，
+        // SceneDelegate 的 restorePlayback 会在启动时触发单例创建），此处不再重复
         return true
     }
 
