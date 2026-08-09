@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mono</string>
+    <string name="folder_list_title">听书</string>
+    <string name="empty_folder_message">暂无音频文件\n\n请将音频文件夹复制到\nMusic/Mono 目录</string>
+    <string name="audio_count">%d 个音频</string>
+    <string name="not_playing">未在播放</string>
+    <string name="delete">删除</string>
+    <string name="cancel">取消</string>
+    <string name="confirm_delete_folder">确定要删除「%s」及其中的所有音频文件吗？</string>
+    <string name="confirm_delete_track">确定要删除「%s」吗？</string>
+    <string name="playback_speed">播放速度</string>
+    <string name="normal_speed">正常</string>
+</resources>
+
+

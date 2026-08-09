@@ -1,0 +1,50 @@
+# Normalize line endings on checkin; check out LF everywhere.
+* text=auto eol=lf
+
+# ---------- Source ----------
+*.swift     text diff=swift
+*.kt        text diff=kotlin
+*.kts       text diff=kotlin
+*.java      text diff=java
+*.gradle    text
+*.pro       text
+
+# ---------- Data & markup ----------
+*.json      text
+*.xml       text
+*.plist     text
+*.storyboard text
+*.xib       text
+*.md        text diff=markdown
+*.yml       text
+*.yaml      text
+*.properties text
+
+# Xcode writes these with tabs; keep them byte-stable.
+*.pbxproj   text eol=lf
+*.xcscheme  text eol=lf
+
+# Gradle wrapper scripts
+gradlew     text eol=lf
+*.bat       text eol=crlf
+
+# ---------- Binary ----------
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.webp      binary
+*.pdf       binary
+*.jar       binary
+*.zip       binary
+*.gz        binary
+*.ttf       binary
+*.otf       binary
+*.mp3       binary
+*.m4a       binary
+*.m4b       binary
+*.wav       binary
+*.flac      binary
+
+# Keep generated/vendored assets out of language stats and diff noise.
+docs/screenshots/** linguist-documentation

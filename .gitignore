@@ -1,0 +1,58 @@
+# ---------- macOS ----------
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# ---------- Xcode ----------
+DerivedData/
+build/
+*.xcuserstate
+*.xcuserdatad/
+**/xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# Swift Package Manager
+.build/
+.swiftpm/xcode/
+
+# ---------- Android / Gradle ----------
+.gradle/
+local.properties
+captures/
+.cxx/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# Keep the Gradle wrapper — it pins the build to a known Gradle version.
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# ---------- Secrets ----------
+.env
+.env.*
+!.env.example
+
+# ---------- Local developer tooling & scratch ----------
+.agents/
+.claude/
+.codex/
+.cursor/
+.cursorrules
+.vscode/
+*.local.md
+scratch/
+*.log
+
+# Tracked on purpose: all app source, app assets (Assets.xcassets, res/),
+# docs/ and docs/screenshots/, and the Gradle wrapper.
